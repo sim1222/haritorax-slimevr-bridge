@@ -1,0 +1,33 @@
+
+pub const PACKET_EOF: u8 = 0xFF;
+
+pub const CURRENT_VERSION: i32 = 5;
+
+pub const PACKET_HEARTBEAT: u32 = 0;
+pub const PACKET_ROTATION: u32 = 1;
+pub const PACKET_GYRO: u32 = 2;
+pub const PACKET_HANDSHAKE: u32 = 3;
+pub const PACKET_ACCEL: u32 = 4;
+pub const PACKET_MAG: u32 = 5;
+pub const PACKET_RAW_CALIBRATION_DATA: u32 = 6;
+pub const PACKET_CALIBRATION_FINISHED: u32 = 7;
+pub const PACKET_CONFIG: u32 = 8;
+pub const PACKET_RAW_MAGENTOMETER: u32 = 9;
+pub const PACKET_PING_PONG: u32 = 10;
+pub const PACKET_SERIAL: u32 = 11;
+pub const PACKET_BATTERY_LEVEL: u32 = 12;
+pub const PACKET_TAP: u32 = 13;
+pub const PACKET_RESET_REASON: u32 = 14;
+pub const PACKET_SENSOR_INFO: u32 = 15;
+pub const PACKET_ROTATION_2: u32 = 16;
+pub const PACKET_ROTATION_DATA: u32 = 17;
+pub const PACKET_MAGENTOMETER_ACCURACY: u32 = 18;
+
+pub const PACKET_BUTTON_PUSHED: u32 = 60;
+pub const PACKET_SEND_MAG_STATUS: u32 = 61;
+pub const PACKET_CHANGE_MAG_STATUS: u32 = 62;
+
+pub const PACKET_RECIEVE_HEARTBEAT: u32 = 1;
+pub const PACKET_RECIEVE_VIBRATE: u32 = 2;
+pub const PACKET_RECIEVE_HANDSHAKE: u32 = 3;
+pub const PACKET_RECIEVE_COMMAND: u32 = 4;
