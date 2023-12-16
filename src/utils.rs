@@ -11,6 +11,16 @@ use crate::constants::{
     *,
 };
 
+pub fn bytes_to_hex_string(bytes: &[u8]) -> String {
+	let mut hex_string = String::new();
+
+	for byte in bytes {
+		hex_string.push_str(&format!("{:02X}", byte));
+	}
+
+	hex_string
+}
+
 pub fn parse_packet(packet: &[u8], packet_count: &mut u64, socket: &UdpSocket) {
     let mut packet = Cursor::new(packet);
 

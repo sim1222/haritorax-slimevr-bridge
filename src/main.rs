@@ -4,6 +4,7 @@ use btleplug::api::{
 };
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
+use constants::constants::PACKET_EOF;
 use futures::stream::StreamExt;
 use nalgebra::{Quaternion, Rotation3, Vector3};
 use rand::prelude::*;
@@ -22,7 +23,9 @@ mod constants;
 mod math;
 mod utils;
 
-use crate::constants::characteristics::{BATTERY_CHARACTERISTIC, SENSOR_CHARACTERISTIC, MAIN_BUTTON_CHARACTERISTIC};
+use crate::constants::characteristics::{
+    BATTERY_CHARACTERISTIC, MAIN_BUTTON_CHARACTERISTIC, SENSOR_CHARACTERISTIC,
+};
 use crate::constants::constants::{
     CURRENT_VERSION, PACKET_ACCEL, PACKET_BATTERY_LEVEL, PACKET_HANDSHAKE, PACKET_ROTATION,
 };
@@ -50,7 +53,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     tracker.connect().await.unwrap();
 
-    println!("Connected to tracker: {:?}", tracker.properties().await.unwrap().unwrap().local_name);
+    println!(
+        "Connected to tracker: {:?}",
+        tracker.properties().await.unwrap().unwrap().local_name
+    );
 
     let mac = tracker.properties().await.unwrap().unwrap().address;
     let mac_bytes: [u8; 6] = mac.as_ref().try_into().unwrap(); // Convert the mac address to a byte array
@@ -243,7 +249,7 @@ async fn find_tracker(central: &Adapter) -> Option<Peripheral> {
     None
 }
 
-fn insert_slime_info(buf: &mut Cursor<[u8; 57]>, mac: [u8; 6]) {
+fn insert_slime_info(buf: &mut Cursor<[u8; 66]>, mac: [u8; 6]) {
     let board_type: u32 = 13;
     let imu_type: u32 = 0; // other
     let mcu_type: u32 = 3; // esp32
@@ -256,8 +262,11 @@ fn insert_slime_info(buf: &mut Cursor<[u8; 57]>, mac: [u8; 6]) {
     let firmware_version_number: u32 = 8;
 
     let firmware_version = "HaritoraX-Wireless".as_bytes();
+    let firmware_version_len = firmware_version.len() as u8;
 
     let mac_address = mac;
+
+    println!("Mac address: {:?}", bytes_to_hex_string(&mac_address));
 
     buf.write(board_type.to_be_bytes().as_ref()).unwrap();
     buf.write(imu_type.to_be_bytes().as_ref()).unwrap();
@@ -270,15 +279,13 @@ fn insert_slime_info(buf: &mut Cursor<[u8; 57]>, mac: [u8; 6]) {
     buf.write(firmware_version_number.to_be_bytes().as_ref())
         .unwrap();
 
-    buf.write(firmware_version.len().to_be_bytes().as_ref())
-        .unwrap();
-    for byte in firmware_version.iter() {
-        buf.write(byte.to_be_bytes().as_ref()).unwrap();
-    }
+    buf.write(firmware_version_len.to_be_bytes().as_ref()).unwrap();
 
-    for byte in mac_address.iter() {
-        buf.write(byte.to_be_bytes().as_ref()).unwrap();
-    }
+    buf.write(firmware_version.as_ref()).unwrap();
+
+    buf.write(mac_address.as_ref()).unwrap();
+
+    buf.write(PACKET_EOF.to_be_bytes().as_ref()).unwrap();
 }
 
 async fn try_handshake(
@@ -286,7 +293,8 @@ async fn try_handshake(
     mac: [u8; 6],
     target: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let mut cur = Cursor::new([0 as u8; 12 + 36 + 9]); // 12 header, 36 slime info, 9 footer
+    // let mut cur = Cursor::new([0 as u8; 12 + 36 + 9]); // 12 header, 36 slime info, 9 footer
+    let mut cur = Cursor::new([0 as u8; 12 + 45 + 9]); // 12 header, 36 slime info, 9 footer
 
     cur.write(PACKET_HANDSHAKE.to_be_bytes().as_ref()).unwrap(); // handshake packet
     cur.write(0u64.to_be_bytes().as_ref()).unwrap(); // handshake packet number
@@ -318,7 +326,6 @@ async fn try_handshake(
 
     if buf.starts_with("Hey OVR =D".as_bytes()) {
         println!("Received handshake packet from {}", src);
-        println!("Packet: {}", std::str::from_utf8(buf).unwrap());
     } else {
         panic!("Received packet with wrong content from {}", src);
     }
