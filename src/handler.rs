@@ -12,7 +12,7 @@ use crate::{
     math::{gravity::Gravity, rotation::Rotation},
 };
 
-pub async fn handle_battery_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &AtomicU64) {
+pub async fn handle_battery_data(data: &[u8], socket: &UdpSocket, packet_count: &AtomicU64) {
     let mut cur = Cursor::new(data);
 
     let battery_level = cur.read_u8().unwrap() as f32 * 0.01;
@@ -31,7 +31,7 @@ pub async fn handle_battery_data(data: &Vec<u8>, socket: &UdpSocket, packet_coun
     socket.send(buf.get_ref()).await.unwrap();
 }
 
-pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &AtomicU64) {
+pub async fn handle_imu_data(data: &[u8], socket: &UdpSocket, packet_count: &AtomicU64) {
     let mut cur = Cursor::new(data);
 
     let rotation = Rotation {
