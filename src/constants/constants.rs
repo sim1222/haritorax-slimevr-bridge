@@ -1,7 +1,6 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 pub const PACKET_EOF: u8 = 0xFF;
-
 pub const CURRENT_VERSION: i32 = 5;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]

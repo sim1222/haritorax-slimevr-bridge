@@ -6,19 +6,16 @@ use std::error::Error;
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::time;
-use uuid::Uuid;
 
 mod bluetooth;
 mod constants;
 mod handler;
+mod haritora;
 mod math;
 mod slimevr;
 mod utils;
 
 use crate::bluetooth::{find_tracker, find_trackers};
-use crate::constants::characteristics::{
-    BATTERY_CHARACTERISTIC, MAIN_BUTTON_CHARACTERISTIC, SENSOR_CHARACTERISTIC,
-};
 use crate::handler::*;
 use crate::slimevr::*;
 
@@ -69,39 +66,27 @@ async fn tracker_worker(tracker: &Peripheral) {
     let chars = tracker.characteristics();
 
     let imu_data = chars
-        .clone()
-        .into_iter()
-        .find(|c| c.uuid == Uuid::parse_str(SENSOR_CHARACTERISTIC).unwrap())
+        .iter()
+        .find(|c| c.uuid == haritora::Characteristics::Sensor.into())
         .unwrap();
 
     let battery_level = chars
-        .clone()
-        .into_iter()
-        .find(|c| c.uuid == Uuid::parse_str(BATTERY_CHARACTERISTIC).unwrap())
+        .iter()
+        .find(|c| c.uuid == haritora::Characteristics::Battery.into())
         .unwrap();
 
     let main_button = chars
-        .clone()
-        .into_iter()
-        .find(|c| c.uuid == Uuid::parse_str(MAIN_BUTTON_CHARACTERISTIC).unwrap())
+        .iter()
+        .find(|c| c.uuid == haritora::Characteristics::MainButton.into())
         .unwrap();
 
     let target = "192.168.1.3:6969";
-    // let target = "255.255.255.255:6969";
 
     let port = rand::thread_rng().gen_range(10000..20000);
 
     let socket = UdpSocket::bind(SocketAddr::from(([0, 0, 0, 0], port)))
         .await
         .expect("Could not bind");
-
-    // socket.set_broadcast(true).expect("Could not set broadcast");
-    // socket
-    //     .set_read_timeout(Some(std::time::Duration::from_millis(2500)))
-    //     .unwrap();
-    // socket
-    //     .set_write_timeout(Some(std::time::Duration::from_millis(2500)))
-    //     .unwrap();
 
     try_handshake(&socket, mac_bytes, target).await.unwrap();
 
@@ -112,7 +97,6 @@ async fn tracker_worker(tracker: &Peripheral) {
     tracker.subscribe(&main_button).await.unwrap();
 
     let mut notifications = tracker.notifications().await.unwrap();
-
     let mut buf = [0u8; 256];
 
     loop {
@@ -121,23 +105,19 @@ async fn tracker_worker(tracker: &Peripheral) {
                 utils::parse_packet(&buf, &packet_c, &socket).await;
             }
             Some(data) = notifications.next() => {
-                match data
-                    .uuid
-                    .hyphenated()
-                    .encode_lower(&mut Uuid::encode_buffer())
-                {
-                    uuid if uuid == SENSOR_CHARACTERISTIC => {
-                        handle_imu_data(&data.value, &socket, &packet_c).await;
+                match data.uuid {
+                    uuid if uuid == haritora::Characteristics::Sensor.into() => {
+                        let (rotation, gravity) = haritora::decode_imu_packet(&data.value).unwrap();
+                        handle_imu_data(rotation, gravity, &socket, &packet_c).await;
                     }
-                    uuid if uuid == BATTERY_CHARACTERISTIC => {
-                        handle_battery_data(&data.value, &socket, &packet_c).await;
+                    uuid if uuid == haritora::Characteristics::Battery.into() => {
+                        let battery_level = haritora::decode_battery_packet(&data.value).unwrap();
+                        handle_battery_data(battery_level, &socket, &packet_c).await;
                     }
-                    uuid if uuid == MAIN_BUTTON_CHARACTERISTIC => {
+                    uuid if uuid == haritora::Characteristics::MainButton.into() => {
                         println!("Received button push");
                     }
-                    _ => {
-                        println!("Received unknown data from tracker");
-                    }
+                    _ => unreachable!("BLE connection maybe corrupted"),
                 }
             }
         }

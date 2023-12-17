@@ -84,7 +84,7 @@ pub async fn try_handshake(
     buf_cursor.read_exact(buf).unwrap();
 
     if buf.starts_with("Hey OVR =D".as_bytes()) {
-        println!("Received handshake packet from {}", src);
+        println!("Received handshake packet from {src}");
     } else {
         panic!("Received packet with wrong content from {}", src);
     }
@@ -98,7 +98,7 @@ pub async fn try_handshake(
         .parse()
         .unwrap();
 
-    println!("Server version: {}", server_version);
+    println!("Server version: {server_version}");
 
     if server_version != CURRENT_VERSION {
         panic!("Server version does not match client version");
@@ -106,7 +106,21 @@ pub async fn try_handshake(
 
     socket.connect(src).await.unwrap();
 
-    println!("Connected to {}", src);
+    println!("Connected to {src}");
 
     Ok(())
 }
+
+// TODO
+// struct ClientBuilder {
+// }
+//
+// struct Client {
+//     socket: tokio::net::UdpSocket,
+// }
+//
+// impl Client {
+//     fn try_new() -> Result<Self, ()> {
+//         Err(())
+//     }
+// }

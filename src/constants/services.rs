@@ -1,7 +1,0 @@
-pub const TRACKER_SERVICE: &str = "00dbec3a-90aa-11ed-a1eb-0242ac120002";
-
-pub const SETTING_SERVICE: &str = "ef84369a-90a9-11ed-a1eb-0242ac120002";
-
-pub const BATTERY_SERVICE: &str = "0000180f-0000-1000-8000-00805f9b34fb";
-
-pub const DEVICE_INFO_SERVICE: &str = "0000180a-0000-1000-8000-00805f9b34fb";

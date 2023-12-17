@@ -3,21 +3,16 @@ use std::{
     sync::atomic::AtomicU64,
 };
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use nalgebra::Vector3;
 use tokio::net::UdpSocket;
 
 use crate::{
     constants::constants::TxPacketType,
-    math::{gravity::Gravity, rotation::Rotation},
+    math::{Gravity, Rotation},
 };
 
-pub async fn handle_battery_data(data: &[u8], socket: &UdpSocket, packet_count: &AtomicU64) {
-    let mut cur = Cursor::new(data);
-
-    let battery_level = cur.read_u8().unwrap() as f32 * 0.01;
-
-    println!("Battery level: {}", battery_level);
+pub async fn handle_battery_data(battery_level: f32, socket: &UdpSocket, packet_count: &AtomicU64) {
+    println!("Battery level: {battery_level}");
 
     let mut buf = Cursor::new([0u8; 12 + 4]); // 12 header, 4 battery level
 
@@ -31,23 +26,12 @@ pub async fn handle_battery_data(data: &[u8], socket: &UdpSocket, packet_count: 
     socket.send(buf.get_ref()).await.unwrap();
 }
 
-pub async fn handle_imu_data(data: &[u8], socket: &UdpSocket, packet_count: &AtomicU64) {
-    let mut cur = Cursor::new(data);
-
-    let rotation = Rotation {
-        x: cur.read_i16::<LittleEndian>().unwrap() as f32 * 0.01,
-        y: cur.read_i16::<LittleEndian>().unwrap() as f32 * 0.01,
-        z: cur.read_i16::<LittleEndian>().unwrap() as f32 * 0.01 * -1.0,
-        w: cur.read_i16::<LittleEndian>().unwrap() as f32 * 0.01 * -1.0,
-    };
-    // let rotation = Quaternion::new(rotation.w, rotation.x, rotation.y, rotation.z);
-
-    let gravity = Gravity {
-        x: cur.read_u8().unwrap() as f32 * 0.01 + cur.read_i8().unwrap() as f32,
-        y: cur.read_u8().unwrap() as f32 * 0.01 + cur.read_i8().unwrap() as f32,
-        z: cur.read_u8().unwrap() as f32 * 0.01 + cur.read_i8().unwrap() as f32,
-    };
-
+pub async fn handle_imu_data(
+    rotation: Rotation,
+    gravity: Gravity,
+    socket: &UdpSocket,
+    packet_count: &AtomicU64,
+) {
     let gravity = Vector3::new(gravity.x, gravity.y, gravity.z);
 
     // println!("Rotation: {:?}", rotation);
@@ -56,10 +40,6 @@ pub async fn handle_imu_data(data: &[u8], socket: &UdpSocket, packet_count: &Ato
 
     // rotation
     let mut buf = Cursor::new([0u8; 12 + 4 * 4]); // 12 header, f32 * 4 rotation
-
-    // let mut packet_count = packet_count.lock().await;
-    //
-    // *packet_count = packet_count.wrapping_add(1);
     let count = packet_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let _ = buf

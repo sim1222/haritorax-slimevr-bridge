@@ -1,2 +1,4 @@
-pub(super) mod rotation;
-pub(super) mod gravity;
+mod rotation;
+mod gravity;
+pub use rotation::Rotation;
+pub use gravity::Gravity;
