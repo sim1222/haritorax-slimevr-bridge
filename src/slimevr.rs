@@ -205,7 +205,7 @@ impl Client {
 
             let version: Vec<u8> = buf
                 .into_iter()
-                .filter(|v| v.is_ascii_alphanumeric())
+                .filter(|v| v.is_ascii_digit())
                 .collect();
             let Ok(version) = std::str::from_utf8(&version) else {
                 continue;
