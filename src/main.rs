@@ -28,7 +28,7 @@ use std::sync::atomic::AtomicU64;
 async fn main() -> Result<(), Box<dyn Error>> {
     let manager = Manager::new().await.unwrap();
     let adapters = manager.adapters().await.unwrap();
-    let central = adapters.into_iter().nth(0).unwrap();
+    let central = adapters.first().unwrap();
 
     central.start_scan(ScanFilter::default()).await.unwrap();
 
@@ -36,9 +36,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     time::sleep(std::time::Duration::from_millis(5000)).await;
 
-    let trackers = find_trackers(&central)
-        .await
-        .expect("Could not find tracker");
+    let trackers = find_trackers(central).await;
+
+    if trackers.is_empty() {
+        panic!("Could not find tracker");
+    }
 
     println!("Found {} trackers", trackers.len());
 
@@ -89,10 +91,9 @@ async fn tracker_worker(tracker: &Peripheral) {
 
     let port = rand::thread_rng().gen_range(10000..20000);
 
-    let socket =
-        UdpSocket::bind(SocketAddr::from(([0, 0, 0, 0], port)))
-            .await
-            .expect("Could not bind");
+    let socket = UdpSocket::bind(SocketAddr::from(([0, 0, 0, 0], port)))
+        .await
+        .expect("Could not bind");
 
     // socket.set_broadcast(true).expect("Could not set broadcast");
     // socket
@@ -105,7 +106,6 @@ async fn tracker_worker(tracker: &Peripheral) {
     try_handshake(&socket, mac_bytes, target).await.unwrap();
 
     let packet_c = AtomicU64::new(0);
-    let packet_c = &packet_c;
 
     tracker.subscribe(&imu_data).await.unwrap();
     tracker.subscribe(&battery_level).await.unwrap();
@@ -118,7 +118,7 @@ async fn tracker_worker(tracker: &Peripheral) {
     loop {
         tokio::select! {
             Ok(_) = socket.recv_from(buf.as_mut()) => {
-                utils::parse_packet(&buf, packet_c, &socket).await;
+                utils::parse_packet(&buf, &packet_c, &socket).await;
             }
             Some(data) = notifications.next() => {
                 match data
@@ -126,13 +126,13 @@ async fn tracker_worker(tracker: &Peripheral) {
                     .hyphenated()
                     .encode_lower(&mut Uuid::encode_buffer())
                 {
-                    uuid if uuid == SENSOR_CHARACTERISTIC.to_owned().as_str() => {
+                    uuid if uuid == SENSOR_CHARACTERISTIC => {
                         handle_imu_data(&data.value, &socket, &packet_c).await;
                     }
-                    uuid if uuid == BATTERY_CHARACTERISTIC.to_owned().as_str() => {
+                    uuid if uuid == BATTERY_CHARACTERISTIC => {
                         handle_battery_data(&data.value, &socket, &packet_c).await;
                     }
-                    uuid if uuid == MAIN_BUTTON_CHARACTERISTIC.to_owned().as_str() => {
+                    uuid if uuid == MAIN_BUTTON_CHARACTERISTIC => {
                         println!("Received button push");
                     }
                     _ => {

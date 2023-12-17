@@ -16,7 +16,7 @@ pub fn bytes_to_hex_string(bytes: &[u8]) -> String {
     hex_string
 }
 
-pub async fn parse_packet(packet: &[u8], packet_count: &AtomicU64, socket: &UdpSocket) {
+pub async fn parse_packet(packet: &[u8], _packet_count: &AtomicU64, socket: &UdpSocket) {
     let mut packet = Cursor::new(packet);
 
     let mut packet_type = [0u8; 4];

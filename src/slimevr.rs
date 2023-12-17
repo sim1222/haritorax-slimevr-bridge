@@ -6,7 +6,7 @@ use std::{
 use tokio::net::UdpSocket;
 
 use crate::{
-    constants::constants::{CURRENT_VERSION, PACKET_EOF, TxPacketType, RxPacketType},
+    constants::constants::{RxPacketType, TxPacketType, CURRENT_VERSION, PACKET_EOF},
     utils::bytes_to_hex_string,
 };
 
@@ -22,32 +22,26 @@ pub fn insert_slime_info(buf: &mut Cursor<[u8; 66]>, mac: [u8; 6]) {
 
     let firmware_version_number: u32 = 8;
 
-    let firmware_version = "HaritoraX-Wireless".as_bytes();
+    let firmware_version = b"HaritoraX-Wireless";
     let firmware_version_len = firmware_version.len() as u8;
 
     let mac_address = mac;
 
     println!("Mac address: {:?}", bytes_to_hex_string(&mac_address));
 
-    buf.write(board_type.to_be_bytes().as_ref()).unwrap();
-    buf.write(imu_type.to_be_bytes().as_ref()).unwrap();
-    buf.write(mcu_type.to_be_bytes().as_ref()).unwrap();
+    let _ = buf.write(&board_type.to_be_bytes()).unwrap();
+    let _ = buf.write(&imu_type.to_be_bytes()).unwrap();
+    let _ = buf.write(&mcu_type.to_be_bytes()).unwrap();
 
     for imu in imu_info.iter() {
-        buf.write(imu.to_be_bytes().as_ref()).unwrap();
+        let _ = buf.write(&imu.to_be_bytes()).unwrap();
     }
 
-    buf.write(firmware_version_number.to_be_bytes().as_ref())
-        .unwrap();
-
-    buf.write(firmware_version_len.to_be_bytes().as_ref())
-        .unwrap();
-
-    buf.write(firmware_version.as_ref()).unwrap();
-
-    buf.write(mac_address.as_ref()).unwrap();
-
-    buf.write(PACKET_EOF.to_be_bytes().as_ref()).unwrap();
+    let _ = buf.write(&firmware_version_number.to_be_bytes()).unwrap();
+    let _ = buf.write(&firmware_version_len.to_be_bytes()).unwrap();
+    let _ = buf.write(firmware_version).unwrap();
+    let _ = buf.write(&mac_address).unwrap();
+    let _ = buf.write(&PACKET_EOF.to_be_bytes()).unwrap();
 }
 
 pub async fn try_handshake(
@@ -55,11 +49,13 @@ pub async fn try_handshake(
     mac: [u8; 6],
     target: &str,
 ) -> Result<(), Box<dyn Error>> {
-    // let mut cur = Cursor::new([0 as u8; 12 + 36 + 9]); // 12 header, 36 slime info, 9 footer
-    let mut cur = Cursor::new([0 as u8; 12 + 45 + 9]); // 12 header, 36 slime info, 9 footer
+    // let mut cur = Cursor::new([0u8; 12 + 36 + 9]); // 12 header, 36 slime info, 9 footer
+    let mut cur = Cursor::new([0u8; 12 + 45 + 9]); // 12 header, 36 slime info, 9 footer
 
-    cur.write(u32::from(TxPacketType::Handshake).to_be_bytes().as_ref()).unwrap(); // handshake packet
-    cur.write(0u64.to_be_bytes().as_ref()).unwrap(); // handshake packet number
+    let _ = cur
+        .write(&u32::from(TxPacketType::Handshake).to_be_bytes())
+        .unwrap(); // handshake packet
+    let _ = cur.write(&0u64.to_be_bytes()).unwrap(); // handshake packet number
 
     insert_slime_info(&mut cur, mac); // Pass the converted value
 
