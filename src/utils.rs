@@ -1,27 +1,22 @@
-use std::{
-    io::{Cursor, Read},
-    net::UdpSocket,
-};
+use std::io::{Cursor, Read};
 
-use crate::constants::{
-    constants::{
-        PACKET_CHANGE_MAG_STATUS, PACKET_PING_PONG, PACKET_RECIEVE_HEARTBEAT,
-        PACKET_RECIEVE_VIBRATE,
-    },
-    *,
+use tokio::net::UdpSocket;
+
+use crate::constants::constants::{
+    PACKET_CHANGE_MAG_STATUS, PACKET_PING_PONG, PACKET_RECIEVE_HEARTBEAT, PACKET_RECIEVE_VIBRATE,
 };
 
 pub fn bytes_to_hex_string(bytes: &[u8]) -> String {
-	let mut hex_string = String::new();
+    let mut hex_string = String::new();
 
-	for byte in bytes {
-		hex_string.push_str(&format!("{:02X}", byte));
-	}
+    for byte in bytes {
+        hex_string.push_str(&format!("{:02X}", byte));
+    }
 
-	hex_string
+    hex_string
 }
 
-pub fn parse_packet(packet: &[u8], packet_count: &mut u64, socket: &UdpSocket) {
+pub async fn parse_packet(packet: &[u8], packet_count: &mut u64, socket: &UdpSocket) {
     let mut packet = Cursor::new(packet);
 
     let mut packet_type = [0u8; 4];
@@ -41,7 +36,7 @@ pub fn parse_packet(packet: &[u8], packet_count: &mut u64, socket: &UdpSocket) {
         }
         PACKET_PING_PONG => {
             // println!("Received ping pong");
-            socket.send(packet.get_ref()).unwrap();
+            socket.send(packet.get_ref()).await.unwrap();
         }
         _ => {
             println!("Received unknown packet type {}", packet_type);
