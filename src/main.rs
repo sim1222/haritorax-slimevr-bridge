@@ -7,19 +7,12 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::time;
 
-mod bluetooth;
-mod constants;
-mod handler;
+mod manager;
 mod haritora;
 mod math;
 mod slimevr;
-mod utils;
 
-use crate::bluetooth::{find_tracker, find_trackers};
-use crate::handler::*;
-use crate::slimevr::*;
-
-use std::sync::atomic::AtomicU64;
+use crate::manager::find_trackers;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -80,7 +73,6 @@ async fn tracker_worker(tracker: &Peripheral) {
         .find(|c| c.uuid == haritora::Characteristics::MainButton.into())
         .unwrap();
 
-    let target = "192.168.1.3:6969";
 
     let port = rand::thread_rng().gen_range(10000..20000);
 
@@ -88,31 +80,31 @@ async fn tracker_worker(tracker: &Peripheral) {
         .await
         .expect("Could not bind");
 
-    try_handshake(&socket, mac_bytes, target).await.unwrap();
-
-    let packet_c = AtomicU64::new(0);
+    let b = slimevr::BoardInfo::new(&mac_bytes).firmware_version("HaritoraX-Wireless");
+    let mut slime_client = slimevr::Client::try_new(socket, &b).await.unwrap();
 
     tracker.subscribe(&imu_data).await.unwrap();
     tracker.subscribe(&battery_level).await.unwrap();
     tracker.subscribe(&main_button).await.unwrap();
 
     let mut notifications = tracker.notifications().await.unwrap();
-    let mut buf = [0u8; 256];
 
     loop {
         tokio::select! {
-            Ok(_) = socket.recv_from(buf.as_mut()) => {
-                utils::parse_packet(&buf, &packet_c, &socket).await;
-            }
+            _ = slime_client.recv() => {
+                // do nothing
+            },
+
             Some(data) = notifications.next() => {
                 match data.uuid {
                     uuid if uuid == haritora::Characteristics::Sensor.into() => {
                         let (rotation, gravity) = haritora::decode_imu_packet(&data.value).unwrap();
-                        handle_imu_data(rotation, gravity, &socket, &packet_c).await;
+                        slime_client.try_send_rotation(&rotation).await.unwrap();
+                        slime_client.try_send_gravity(&gravity).await.unwrap();
                     }
                     uuid if uuid == haritora::Characteristics::Battery.into() => {
                         let battery_level = haritora::decode_battery_packet(&data.value).unwrap();
-                        handle_battery_data(battery_level, &socket, &packet_c).await;
+                        slime_client.try_send_battery_level(battery_level).await.unwrap();
                     }
                     uuid if uuid == haritora::Characteristics::MainButton.into() => {
                         println!("Received button push");
