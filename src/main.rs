@@ -4,9 +4,7 @@ use futures::stream::StreamExt;
 use rand::prelude::*;
 use std::error::Error;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::UdpSocket;
-use tokio::sync::Mutex;
 use tokio::time;
 use uuid::Uuid;
 
@@ -23,6 +21,8 @@ use crate::constants::characteristics::{
 };
 use crate::handler::*;
 use crate::slimevr::*;
+
+use std::sync::atomic::AtomicU64;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -89,11 +89,10 @@ async fn tracker_worker(tracker: &Peripheral) {
 
     let port = rand::thread_rng().gen_range(10000..20000);
 
-    let socket = Arc::new(
+    let socket =
         UdpSocket::bind(SocketAddr::from(([0, 0, 0, 0], port)))
             .await
-            .expect("Could not bind"),
-    );
+            .expect("Could not bind");
 
     // socket.set_broadcast(true).expect("Could not set broadcast");
     // socket
@@ -105,7 +104,8 @@ async fn tracker_worker(tracker: &Peripheral) {
 
     try_handshake(&socket, mac_bytes, target).await.unwrap();
 
-    let packet_count = Arc::new(Mutex::new(0u64));
+    let packet_c = AtomicU64::new(0);
+    let packet_c = &packet_c;
 
     tracker.subscribe(&imu_data).await.unwrap();
     tracker.subscribe(&battery_level).await.unwrap();
@@ -113,34 +113,32 @@ async fn tracker_worker(tracker: &Peripheral) {
 
     let mut notifications = tracker.notifications().await.unwrap();
 
-    let sock = Arc::clone(&socket);
-    let packet_c = Arc::clone(&packet_count);
-    tokio::spawn(async move { handle_slime_packet(&sock, &packet_c).await });
+    let mut buf = [0u8; 256];
 
-    // main loop for notificated data from the tracker
     loop {
-        let data = notifications.next().await.unwrap();
-
-        match data
-            .uuid
-            .hyphenated()
-            .encode_lower(&mut Uuid::encode_buffer())
-        {
-            uuid if uuid == SENSOR_CHARACTERISTIC.to_owned().as_str() => {
-                let sock = Arc::clone(&socket);
-                let packet_c = Arc::clone(&packet_count);
-                handle_imu_data(&data.value, &sock, &packet_c);
+        tokio::select! {
+            Ok(_) = socket.recv_from(buf.as_mut()) => {
+                utils::parse_packet(&buf, packet_c, &socket).await;
             }
-            uuid if uuid == BATTERY_CHARACTERISTIC.to_owned().as_str() => {
-                let sock = Arc::clone(&socket);
-                let packet_c = Arc::clone(&packet_count);
-                handle_battery_data(&data.value, &sock, &packet_c);
-            }
-            uuid if uuid == MAIN_BUTTON_CHARACTERISTIC.to_owned().as_str() => {
-                println!("Received button push");
-            }
-            _ => {
-                println!("Received unknown data from tracker");
+            Some(data) = notifications.next() => {
+                match data
+                    .uuid
+                    .hyphenated()
+                    .encode_lower(&mut Uuid::encode_buffer())
+                {
+                    uuid if uuid == SENSOR_CHARACTERISTIC.to_owned().as_str() => {
+                        handle_imu_data(&data.value, &socket, &packet_c).await;
+                    }
+                    uuid if uuid == BATTERY_CHARACTERISTIC.to_owned().as_str() => {
+                        handle_battery_data(&data.value, &socket, &packet_c).await;
+                    }
+                    uuid if uuid == MAIN_BUTTON_CHARACTERISTIC.to_owned().as_str() => {
+                        println!("Received button push");
+                    }
+                    _ => {
+                        println!("Received unknown data from tracker");
+                    }
+                }
             }
         }
     }

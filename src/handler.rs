@@ -1,11 +1,11 @@
 use std::{
     io::{Cursor, Write},
-    sync::Arc,
+    sync::atomic::AtomicU64,
 };
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use nalgebra::Vector3;
-use tokio::{net::UdpSocket, sync::Mutex};
+use tokio::net::UdpSocket;
 
 use crate::{
     constants::constants::TxPacketType,
@@ -13,19 +13,7 @@ use crate::{
     utils::parse_packet,
 };
 
-pub async fn handle_slime_packet(socket: &UdpSocket, packet_count: &Arc<Mutex<u64>>) {
-    loop {
-        let mut buf = [0u8; 256];
-        socket.recv_from(buf.as_mut()).await.unwrap();
-        parse_packet(&buf, &mut *packet_count.lock().await, &socket);
-    }
-}
-
-pub async fn handle_battery_data(
-    data: &Vec<u8>,
-    socket: &UdpSocket,
-    packet_count: &Arc<Mutex<u64>>,
-) {
+pub async fn handle_battery_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &AtomicU64) {
     let mut cur = Cursor::new(data);
 
     let battery_level = cur.read_u8().unwrap() as f32 * 0.01;
@@ -34,19 +22,16 @@ pub async fn handle_battery_data(
 
     let mut buf = Cursor::new([0u8; 12 + 4]); // 12 header, 4 battery level
 
-    let mut packet_count = packet_count.lock().await;
-
-    *packet_count = packet_count.wrapping_add(1);
-
+    let count = packet_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     buf.write(u32::from(TxPacketType::BatteryLevel).to_be_bytes().as_ref())
         .unwrap();
-    buf.write(packet_count.to_be_bytes().as_ref()).unwrap();
+    buf.write(count.to_be_bytes().as_ref()).unwrap();
     buf.write(battery_level.to_be_bytes().as_ref()).unwrap();
 
     socket.send(buf.get_ref()).await.unwrap();
 }
 
-pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &Arc<Mutex<u64>>) {
+pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &AtomicU64) {
     let mut cur = Cursor::new(data);
 
     let rotation = Rotation {
@@ -72,12 +57,14 @@ pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &
     // rotation
     let mut buf = Cursor::new([0u8; 12 + 4 * 4]); // 12 header, f32 * 4 rotation
 
-    let mut packet_count = packet_count.lock().await;
+    // let mut packet_count = packet_count.lock().await;
+    //
+    // *packet_count = packet_count.wrapping_add(1);
+    let count = packet_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-    *packet_count = packet_count.wrapping_add(1);
-
-    buf.write(u32::from(TxPacketType::Rotation).to_be_bytes().as_ref()).unwrap();
-    buf.write(packet_count.to_be_bytes().as_ref()).unwrap();
+    buf.write(u32::from(TxPacketType::Rotation).to_be_bytes().as_ref())
+        .unwrap();
+    buf.write(count.to_be_bytes().as_ref()).unwrap();
     buf.write(rotation.x.to_be_bytes().as_ref()).unwrap();
     buf.write(rotation.y.to_be_bytes().as_ref()).unwrap();
     buf.write(rotation.z.to_be_bytes().as_ref()).unwrap();
@@ -94,10 +81,11 @@ pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &
     // accel
     let mut buf = Cursor::new([0u8; 12 + 4 * 3]); // 12 header, f32 * 3 accel
 
-    *packet_count = packet_count.wrapping_add(1);
+    let count = packet_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-    buf.write(u32::from(TxPacketType::Accel).to_be_bytes().as_ref()).unwrap();
-    buf.write(packet_count.to_be_bytes().as_ref()).unwrap();
+    buf.write(u32::from(TxPacketType::Accel).to_be_bytes().as_ref())
+        .unwrap();
+    buf.write(count.to_be_bytes().as_ref()).unwrap();
     buf.write(gravity.x.to_be_bytes().as_ref()).unwrap();
     buf.write(gravity.y.to_be_bytes().as_ref()).unwrap();
     buf.write(gravity.z.to_be_bytes().as_ref()).unwrap();

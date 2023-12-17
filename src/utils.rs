@@ -1,5 +1,7 @@
 use std::io::{Cursor, Read};
 
+use std::sync::atomic::AtomicU64;
+
 use tokio::net::UdpSocket;
 
 use crate::constants::constants::RxPacketType;
@@ -14,7 +16,7 @@ pub fn bytes_to_hex_string(bytes: &[u8]) -> String {
     hex_string
 }
 
-pub async fn parse_packet(packet: &[u8], packet_count: &mut u64, socket: &UdpSocket) {
+pub async fn parse_packet(packet: &[u8], packet_count: &AtomicU64, socket: &UdpSocket) {
     let mut packet = Cursor::new(packet);
 
     let mut packet_type = [0u8; 4];
