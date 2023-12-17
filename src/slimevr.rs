@@ -180,7 +180,7 @@ impl Client {
         let mut cur = Cursor::new(vec![]);
         write_handshake_packet(&mut cur, b);
         socket
-            .send_to(cur.get_ref(), "255.255.255.255:6868")
+            .send_to(cur.get_ref(), "255.255.255.255:6969")
             .await
             .map_err(ClientError::SendHandShakePacket)?;
 
