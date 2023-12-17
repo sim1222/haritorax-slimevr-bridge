@@ -5,10 +5,10 @@ use std::{
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use nalgebra::Vector3;
-use tokio::{sync::Mutex, net::UdpSocket};
+use tokio::{net::UdpSocket, sync::Mutex};
 
 use crate::{
-    constants::constants::{PACKET_ACCEL, PACKET_BATTERY_LEVEL, PACKET_ROTATION},
+    constants::constants::TxPacketType,
     math::{gravity::Gravity, rotation::Rotation},
     utils::parse_packet,
 };
@@ -21,7 +21,11 @@ pub async fn handle_slime_packet(socket: &UdpSocket, packet_count: &Arc<Mutex<u6
     }
 }
 
-pub async fn handle_battery_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &Arc<Mutex<u64>>) {
+pub async fn handle_battery_data(
+    data: &Vec<u8>,
+    socket: &UdpSocket,
+    packet_count: &Arc<Mutex<u64>>,
+) {
     let mut cur = Cursor::new(data);
 
     let battery_level = cur.read_u8().unwrap() as f32 * 0.01;
@@ -34,7 +38,7 @@ pub async fn handle_battery_data(data: &Vec<u8>, socket: &UdpSocket, packet_coun
 
     *packet_count = packet_count.wrapping_add(1);
 
-    buf.write(PACKET_BATTERY_LEVEL.to_be_bytes().as_ref())
+    buf.write(u32::from(TxPacketType::BatteryLevel).to_be_bytes().as_ref())
         .unwrap();
     buf.write(packet_count.to_be_bytes().as_ref()).unwrap();
     buf.write(battery_level.to_be_bytes().as_ref()).unwrap();
@@ -72,7 +76,7 @@ pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &
 
     *packet_count = packet_count.wrapping_add(1);
 
-    buf.write(PACKET_ROTATION.to_be_bytes().as_ref()).unwrap();
+    buf.write(u32::from(TxPacketType::Rotation).to_be_bytes().as_ref()).unwrap();
     buf.write(packet_count.to_be_bytes().as_ref()).unwrap();
     buf.write(rotation.x.to_be_bytes().as_ref()).unwrap();
     buf.write(rotation.y.to_be_bytes().as_ref()).unwrap();
@@ -92,7 +96,7 @@ pub async fn handle_imu_data(data: &Vec<u8>, socket: &UdpSocket, packet_count: &
 
     *packet_count = packet_count.wrapping_add(1);
 
-    buf.write(PACKET_ACCEL.to_be_bytes().as_ref()).unwrap();
+    buf.write(u32::from(TxPacketType::Accel).to_be_bytes().as_ref()).unwrap();
     buf.write(packet_count.to_be_bytes().as_ref()).unwrap();
     buf.write(gravity.x.to_be_bytes().as_ref()).unwrap();
     buf.write(gravity.y.to_be_bytes().as_ref()).unwrap();

@@ -6,7 +6,7 @@ use std::{
 use tokio::net::UdpSocket;
 
 use crate::{
-    constants::constants::{CURRENT_VERSION, PACKET_EOF, PACKET_HANDSHAKE},
+    constants::constants::{CURRENT_VERSION, PACKET_EOF, TxPacketType, RxPacketType},
     utils::bytes_to_hex_string,
 };
 
@@ -58,7 +58,7 @@ pub async fn try_handshake(
     // let mut cur = Cursor::new([0 as u8; 12 + 36 + 9]); // 12 header, 36 slime info, 9 footer
     let mut cur = Cursor::new([0 as u8; 12 + 45 + 9]); // 12 header, 36 slime info, 9 footer
 
-    cur.write(PACKET_HANDSHAKE.to_be_bytes().as_ref()).unwrap(); // handshake packet
+    cur.write(u32::from(TxPacketType::Handshake).to_be_bytes().as_ref()).unwrap(); // handshake packet
     cur.write(0u64.to_be_bytes().as_ref()).unwrap(); // handshake packet number
 
     insert_slime_info(&mut cur, mac); // Pass the converted value
@@ -78,7 +78,7 @@ pub async fn try_handshake(
 
     let mut buf_cursor = Cursor::new(buf);
 
-    if buf_cursor.get_ref()[0] != PACKET_HANDSHAKE as u8 {
+    if buf_cursor.get_ref()[0] != u32::from(RxPacketType::Handshake) as u8 {
         panic!("Received packet with wrong type from {}", src);
     }
 

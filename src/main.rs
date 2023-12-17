@@ -49,8 +49,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         time::sleep(std::time::Duration::from_millis(5000)).await;
     }
-
-    Ok(())
 }
 
 async fn tracker_worker(tracker: &Peripheral) {
@@ -89,9 +87,7 @@ async fn tracker_worker(tracker: &Peripheral) {
     let target = "192.168.1.3:6969";
     // let target = "255.255.255.255:6969";
 
-    let mut rng = rand::thread_rng();
-
-    let port = rng.gen_range(10000..20000);
+    let port = rand::thread_rng().gen_range(10000..20000);
 
     let socket = Arc::new(
         UdpSocket::bind(SocketAddr::from(([0, 0, 0, 0], port)))
