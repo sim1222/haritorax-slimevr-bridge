@@ -165,6 +165,7 @@ impl SafePacketNumberGenerator {
 
 #[derive(Debug)]
 pub enum ClientError {
+    UdpSocketError(std::io::Error),
     SendHandShakePacket(std::io::Error),
     ReceiveHandShakePacket(std::io::Error),
 }
@@ -177,6 +178,8 @@ pub struct Client {
 
 impl Client {
     pub async fn try_new(socket: UdpSocket, b: &BoardInfo) -> Result<Self, ClientError> {
+        socket.set_broadcast(true).map_err(ClientError::UdpSocketError)?;
+
         let mut cur = Cursor::new(vec![]);
         write_handshake_packet(&mut cur, b);
         socket
