@@ -8,10 +8,6 @@ pub struct Gravity {
 
 impl Debug for Gravity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Gyro")
-            .field("x", &self.x)
-            .field("y", &self.y)
-            .field("z", &self.z)
-            .finish()
+        write!(f, "Gravity: ({:06.2}, {:06.2}, {:06.2})", self.x, self.y, self.z)
     }
 }

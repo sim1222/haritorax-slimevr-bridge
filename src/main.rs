@@ -83,6 +83,8 @@ async fn tracker_worker(tracker: &Peripheral) {
     let b = slimevr::BoardInfo::new(&mac_bytes).firmware_version("HaritoraX-Wireless");
     let mut slime_client = slimevr::Client::try_new(socket, &b).await.unwrap();
 
+    slime_client.try_send_mag_enabled(true).await.unwrap();
+
     tracker.subscribe(&imu_data).await.unwrap();
     tracker.subscribe(&battery_level).await.unwrap();
     tracker.subscribe(&main_button).await.unwrap();
@@ -90,6 +92,11 @@ async fn tracker_worker(tracker: &Peripheral) {
     let mut notifications = tracker.notifications().await.unwrap();
 
     loop {
+        if !tracker.is_connected().await.unwrap() {
+            println!("Tracker disconnected");
+            break;
+        }
+
         tokio::select! {
             _ = slime_client.recv() => {
                 // do nothing

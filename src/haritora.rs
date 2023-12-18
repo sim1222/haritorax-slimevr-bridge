@@ -1,5 +1,6 @@
 use crate::math::{Gravity, Rotation};
 use byteorder::{LittleEndian as LE, ReadBytesExt};
+use quaternion_core::Vector3;
 use std::io::Cursor;
 use uuid::{uuid, Uuid};
 
@@ -73,17 +74,39 @@ pub fn decode_imu_packet(data: &[u8]) -> Result<(Rotation, Gravity), DecodeError
     let mut cur = Cursor::new(data);
 
     let rotation = Rotation {
-        x: cur.read_i16::<LE>().map_err(|_| E)? as f32 * 0.01,
-        y: cur.read_i16::<LE>().map_err(|_| E)? as f32 * 0.01,
-        z: cur.read_i16::<LE>().map_err(|_| E)? as f32 * 0.01 * -1.0,
-        w: cur.read_i16::<LE>().map_err(|_| E)? as f32 * 0.01 * -1.0,
+        x: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 180f32 * 0.01,
+        y: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 180f32 * 0.01,
+        z: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 180f32 * 0.01 * -1.0,
+        w: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 180f32 * 0.01 * -1.0,
     };
 
+    let rotation_vec: Vector3<f32> = rotation.to_vector3();
+
+    let gravity_accell: Vector3<f32> = [
+        rotation_vec[0].sin() * rotation_vec[2].cos(),
+        rotation_vec[1].sin() * rotation_vec[2].cos(),
+        rotation_vec[2].sin(),
+    ];
+
+    let gravity_raw: Vector3<f32> = [
+        cur.read_i16::<LE>().map_err(|_| E)? as f32 / 256f32,
+        cur.read_i16::<LE>().map_err(|_| E)? as f32 / 256f32,
+        cur.read_i16::<LE>().map_err(|_| E)? as f32 / 256f32,
+    ];
+
+    // let gravity = Gravity {
+    //     x: gravity_raw[0] - gravity_accell[0],
+    //     y: gravity_raw[1] - gravity_accell[1] * -1.0,
+    //     z: gravity_raw[2] - gravity_accell[2],
+    // };
+
     let gravity = Gravity {
-        x: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 256f32,
-        y: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 256f32,
-        z: cur.read_i16::<LE>().map_err(|_| E)? as f32 / 256f32,
+        x: gravity_raw[0],
+        y: gravity_raw[1],
+        z: gravity_raw[2],
     };
+
+    // print!("Accel: {gravity:?} | Raw: ({:06.2}, {:06.2}, {:06.2}) | Minus: ({:06.2}, {:06.2}, {:06.2}) | Rotation: ({:06.2}, {:06.2}, {:06.2}) | RQ: {rotation:?}\n", gravity_raw[0], gravity_raw[1], gravity_raw[2], gravity_accell[0], gravity_accell[1], gravity_accell[2], rotation_vec[0], rotation_vec[1], rotation_vec[2]);
 
     Ok((rotation, gravity))
 }

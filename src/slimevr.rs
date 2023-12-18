@@ -1,4 +1,4 @@
-use std::io::{Cursor, Write, Read};
+use std::io::{Cursor, Read, Write};
 
 use tokio::net::UdpSocket;
 
@@ -178,7 +178,9 @@ pub struct Client {
 
 impl Client {
     pub async fn try_new(socket: UdpSocket, b: &BoardInfo) -> Result<Self, ClientError> {
-        socket.set_broadcast(true).map_err(ClientError::UdpSocketError)?;
+        socket
+            .set_broadcast(true)
+            .map_err(ClientError::UdpSocketError)?;
 
         let mut cur = Cursor::new(vec![]);
         write_handshake_packet(&mut cur, b);
@@ -203,10 +205,7 @@ impl Client {
                 continue;
             }
 
-            let version: Vec<u8> = buf
-                .into_iter()
-                .filter(|v| v.is_ascii_digit())
-                .collect();
+            let version: Vec<u8> = buf.into_iter().filter(|v| v.is_ascii_digit()).collect();
             let Ok(version) = std::str::from_utf8(&version) else {
                 continue;
             };
@@ -265,11 +264,13 @@ impl Client {
         let packet_type = RxPacketType::try_from(u32::from_be_bytes(packet_type));
 
         match packet_type {
-            Ok(RxPacketType::Heartbeat) => println!("Received heartbeat"),
+            Ok(RxPacketType::Heartbeat) => {
+                // println!("Received heartbeat")
+            },
             Ok(RxPacketType::Vibrate) => println!("Received vibrate"),
             Ok(RxPacketType::PingPong) => {
                 self.socket.send(packet.get_ref()).await.unwrap();
-                println!("Received ping pong");
+                // println!("Received ping pong");
             }
             Ok(RxPacketType::Handshake) => unreachable!("Unexpected Handshake packet"),
             Ok(RxPacketType::Command) => println!("Received command"),
@@ -291,6 +292,20 @@ impl Client {
         let _ = buf.write(&gravity.x.to_be_bytes()).unwrap();
         let _ = buf.write(&gravity.y.to_be_bytes()).unwrap();
         let _ = buf.write(&gravity.z.to_be_bytes()).unwrap();
+
+        self.socket.send(buf.get_ref()).await.unwrap();
+
+        Ok(())
+    }
+
+    pub async fn try_send_mag_enabled(&mut self, enabled: bool) -> Result<(), std::io::Error> {
+        let mut buf = Cursor::new([0u8; 12 + 1]); // 12 header, 1 mag enabled
+
+        let _ = buf
+            .write(&u32::from(TxPacketType::SendMagStatus).to_be_bytes())
+            .unwrap();
+        let _ = buf.write(&self.packet_number.next().to_be_bytes()).unwrap();
+        let _ = buf.write(if enabled { b"y" } else { b"n" }).unwrap();
 
         self.socket.send(buf.get_ref()).await.unwrap();
 

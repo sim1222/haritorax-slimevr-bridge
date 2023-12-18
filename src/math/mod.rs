@@ -1,4 +1,4 @@
-mod rotation;
 mod gravity;
-pub use rotation::Rotation;
+mod rotation;
 pub use gravity::Gravity;
+pub use rotation::Rotation;
