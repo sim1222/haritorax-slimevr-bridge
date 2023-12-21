@@ -1,5 +1,5 @@
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
-use btleplug::platform::{Manager, Peripheral};
+use btleplug::platform::{Adapter, Manager, Peripheral};
 use futures::stream::StreamExt;
 use rand::prelude::*;
 use std::error::Error;
@@ -7,8 +7,8 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::time;
 
-mod manager;
 mod haritora;
+mod manager;
 mod math;
 mod slimevr;
 
@@ -20,6 +20,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let adapters = manager.adapters().await.unwrap();
     let central = adapters.first().unwrap();
 
+    let trackers = scan_trackers(central).await;
+
+    for tracker in trackers {
+        tokio::spawn(async move { tracker_worker(&tracker).await });
+        time::sleep(std::time::Duration::from_millis(1000)).await;
+    }
+
+    loop {
+        time::sleep(std::time::Duration::from_millis(5000)).await;
+    }
+}
+
+async fn scan_trackers(central: &Adapter) -> Vec<Peripheral> {
     central.start_scan(ScanFilter::default()).await.unwrap();
 
     println!("Scanning for 5 seconds...");
@@ -34,13 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Found {} trackers", trackers.len());
 
-    for tracker in trackers {
-        tokio::spawn(async move { tracker_worker(&tracker).await });
-    }
-
-    loop {
-        time::sleep(std::time::Duration::from_millis(5000)).await;
-    }
+    trackers
 }
 
 async fn tracker_worker(tracker: &Peripheral) {
@@ -72,7 +79,6 @@ async fn tracker_worker(tracker: &Peripheral) {
         .iter()
         .find(|c| c.uuid == haritora::Characteristics::MainButton.into())
         .unwrap();
-
 
     let port = rand::thread_rng().gen_range(10000..20000);
 
