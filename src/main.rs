@@ -24,7 +24,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     for tracker in trackers {
         tokio::spawn(async move { tracker_worker(&tracker).await });
-        // time::sleep(std::time::Duration::from_millis(1000)).await;
     }
 
     loop {
