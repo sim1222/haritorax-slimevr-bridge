@@ -50,10 +50,11 @@ async fn scan_trackers(central: &Adapter) -> Vec<Peripheral> {
 }
 
 async fn tracker_worker(tracker: &Peripheral) {
-    let mut res = tracker.connect().await;
-    while res.is_err() {
-        println!("Failed to connect to tracker, trying again: {:?}", res);
-        res = tracker.connect().await;
+    loop {
+        match tracker.connect().await {
+            Ok(_) => break,
+            Err(e) => println!("Failed to connect to tracker, trying again: {e}"),
+        }
     }
 
     println!(
