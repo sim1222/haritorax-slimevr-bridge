@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     for tracker in trackers {
         tokio::spawn(async move { tracker_worker(&tracker).await });
-        time::sleep(std::time::Duration::from_millis(1000)).await;
+        // time::sleep(std::time::Duration::from_millis(1000)).await;
     }
 
     loop {
@@ -51,7 +51,11 @@ async fn scan_trackers(central: &Adapter) -> Vec<Peripheral> {
 }
 
 async fn tracker_worker(tracker: &Peripheral) {
-    tracker.connect().await.unwrap();
+    let mut res = tracker.connect().await;
+    while res.is_err() {
+        println!("Failed to connect to tracker, trying again: {:?}", res);
+        res = tracker.connect().await;
+    }
 
     println!(
         "Connected to tracker: {:?}",
