@@ -29,6 +29,9 @@ enum TxPacketType {
     Rotation2 = 16,
     RotationData = 17,
     MagentometerAccuracy = 18,
+    SignalStrength = 19,
+    Temperature = 20,
+    UserAction = 21,
     ButtonPushed = 60,
     SendMagStatus = 61,
 }
@@ -42,6 +45,15 @@ enum RxPacketType {
     Command = 4,
     PingPong = 10,
     ChangeMagStatus = 62,
+}
+
+#[derive(IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
+pub enum UserActionType {
+    ResetFull = 2,
+    ResetYaw = 3,
+    ResetMounting = 4,
+    PauseTracking = 5,
 }
 
 #[derive(Debug, Clone)]
@@ -323,6 +335,19 @@ impl Client {
             .unwrap();
         let _ = buf.write(&self.packet_number.next().to_be_bytes()).unwrap();
         let _ = buf.write(&battery_level.to_be_bytes()).unwrap();
+
+        self.socket.send(buf.get_ref()).await.unwrap();
+        Ok(())
+    }
+
+    pub async fn try_send_user_action(&mut self, user_action: u8) -> Result<(), std::io::Error> {
+        let mut buf = Cursor::new([0u8; 12 + 1]); // 12 header, 1 user action
+
+        let _ = buf
+            .write(&u32::from(TxPacketType::UserAction).to_be_bytes())
+            .unwrap();
+        let _ = buf.write(&self.packet_number.next().to_be_bytes()).unwrap();
+        let _ = buf.write(&user_action.to_be_bytes()).unwrap();
 
         self.socket.send(buf.get_ref()).await.unwrap();
         Ok(())

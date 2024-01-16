@@ -125,6 +125,7 @@ async fn tracker_worker(tracker: &Peripheral) {
                     }
                     uuid if uuid == haritora::Characteristics::MainButton.into() => {
                         println!("Received button push");
+                        slime_client.try_send_user_action(u8::from(slimevr::UserActionType::ResetYaw)).await.unwrap();
                     }
                     _ => unreachable!("BLE connection maybe corrupted"),
                 }
