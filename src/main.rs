@@ -1,3 +1,4 @@
+use crate::math::{Gravity};
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use futures::stream::StreamExt;
@@ -100,6 +101,7 @@ async fn tracker_worker(tracker: &Peripheral) {
     tracker.subscribe(&main_button).await.unwrap();
 
     let mut notifications = tracker.notifications().await.unwrap();
+    let mut oldgrav = Gravity {x:0.0,y:0.0,z:0.0};
 
     loop {
         if !tracker.is_connected().await.unwrap() {
@@ -116,8 +118,14 @@ async fn tracker_worker(tracker: &Peripheral) {
                 match data.uuid {
                     uuid if uuid == haritora::Characteristics::Sensor.into() => {
                         let (rotation, gravity) = haritora::decode_imu_packet(&data.value).unwrap();
+                        let newgrav = Gravity {x: gravity.x - oldgrav.x, 
+                            y: gravity.y - oldgrav.y, 
+                            z: gravity.z - oldgrav.z
+                        };
+                        oldgrav = Gravity {x:gravity.x, y:gravity.y, z:gravity.z};
+
                         slime_client.try_send_rotation(&rotation).await.unwrap();
-                        slime_client.try_send_gravity(&gravity).await.unwrap();
+                        slime_client.try_send_gravity(&newgrav).await.unwrap();
                     }
                     uuid if uuid == haritora::Characteristics::Battery.into() => {
                         let battery_level = haritora::decode_battery_packet(&data.value).unwrap();
